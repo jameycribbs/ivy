@@ -1,3 +1,5 @@
+// Package ivy provides a simple, file-based Database Management System (DBMS)
+// that can be used in Go programs.
 package ivy
 
 import (
@@ -11,10 +13,12 @@ import (
 	"sync"
 )
 
+// Type Record is an interface that your table model needs to implement.
 type Record interface {
 	AfterFind(*DB, string)
 }
 
+// Type DB is a struct representing the database connection.
 type DB struct {
 	path          string
 	rwLocks       map[string]*sync.RWMutex
@@ -22,6 +26,8 @@ type DB struct {
 	tagIndexes    map[string]map[string][]string
 }
 
+// OpenDB initializes an ivy database.
+// It returns a pointer to a DB struct and any error encountered.
 func OpenDB(dbPath string, fieldsToIndex map[string][]string) (*DB, error) {
 	db := new(DB)
 
@@ -66,7 +72,11 @@ func OpenDB(dbPath string, fieldsToIndex map[string][]string) (*DB, error) {
 /*****************************************************************************/
 // Public DB Methods
 /*****************************************************************************/
-/*---------- Find ----------*/
+
+// Find loads up a Record struct with the record corresponding to a supplied id.
+// It takes a table name, a pointer to a Record struct, and an id specifying the record to find.
+// It populates the Record struct attributes with values from the found record.
+// It returns any error encountered.
 func (db *DB) Find(tblName string, rec Record, fileId string) error {
 	db.rwLocks[tblName].RLock()
 	defer db.rwLocks[tblName].RUnlock()
@@ -81,7 +91,26 @@ func (db *DB) Find(tblName string, rec Record, fileId string) error {
 	return nil
 }
 
-/*---------- FindFirstIdForField ----------*/
+// FindAllIds return all ids for the specified table name.
+// It takes a table name.
+// It returns a slice of ids and any error encountered.
+func (db *DB) FindAllIds(tblName string) ([]string, error) {
+	var ids []string
+
+	db.rwLocks[tblName].RLock()
+	defer db.rwLocks[tblName].RUnlock()
+
+	// For every file in the data dir...
+	for _, fileId := range db.fileIdsInDataDir(tblName) {
+		ids = append(ids, fileId)
+	}
+
+	return ids, nil
+}
+
+// FindFirstIdForField returns the first record id that matches the supplied search criteria.
+// It takes a table name, a field name to search on, and a value to search for.
+// It returns a record id and any error encountered.
 func (db *DB) FindFirstIdForField(tblName string, searchField string, searchValue interface{}) (string, error) {
 	var rec map[string]interface{}
 
@@ -125,22 +154,9 @@ func (db *DB) FindFirstIdForField(tblName string, searchField string, searchValu
 	return "", nil
 }
 
-/*---------- FindAllIds ----------*/
-func (db *DB) FindAllIds(tblName string) ([]string, error) {
-	var ids []string
-
-	db.rwLocks[tblName].RLock()
-	defer db.rwLocks[tblName].RUnlock()
-
-	// For every file in the data dir...
-	for _, fileId := range db.fileIdsInDataDir(tblName) {
-		ids = append(ids, fileId)
-	}
-
-	return ids, nil
-}
-
-/*---------- FindAllIdsForField ----------*/
+// FindAllIdsForField returns all record ids that match the supplied search criteria.
+// It takes a table name, a field name to search on, and a value to search for.
+// It returns a slice of record ids and any error encountered.
 func (db *DB) FindAllIdsForField(tblName string, searchField string, searchValue interface{}) ([]string, error) {
 	var rec map[string]interface{}
 	var ids []string
@@ -178,7 +194,9 @@ func (db *DB) FindAllIdsForField(tblName string, searchField string, searchValue
 	return ids, nil
 }
 
-/*---------- FindAllIdsForTags ----------*/
+// FindAllIdsForTag returns all record ids that match the all of the supplied search tags.
+// It takes a table name, and a slice of tags to search for.
+// It returns a slice of record ids and any error encountered.
 func (db *DB) FindAllIdsForTags(tblName string, searchTags []string) ([]string, error) {
 	var ids []string
 	var possibleMatchingFileIdsMap map[string]int
@@ -226,7 +244,9 @@ func (db *DB) FindAllIdsForTags(tblName string, searchTags []string) ([]string, 
 
 }
 
-/*---------- Create ----------*/
+// Create creates a new record for the specified table.
+// It takes a table name, and a struct representing the record data.
+// It returns the id of the newly created record and any error encountered.
 func (db *DB) Create(tblName string, rec interface{}) (string, error) {
 	db.rwLocks[tblName].Lock()
 	defer db.rwLocks[tblName].Unlock()
@@ -257,7 +277,9 @@ func (db *DB) Create(tblName string, rec interface{}) (string, error) {
 	return fileId, nil
 }
 
-/*---------- Update ----------*/
+// Update updates a record for the specified table.
+// It takes a table name, a struct representing the record data, and the record id of the record to be changed..
+// It returns any error encountered.
 func (db *DB) Update(tblName string, rec interface{}, fileId string) error {
 	db.rwLocks[tblName].Lock()
 	defer db.rwLocks[tblName].Unlock()
@@ -289,7 +311,9 @@ func (db *DB) Update(tblName string, rec interface{}, fileId string) error {
 	return nil
 }
 
-/*---------- Delete ----------*/
+// Delete deletes a record for the specified table.
+// It takes a table name and the record id of the record to be deleted..
+// It returns any error encountered.
 func (db *DB) Delete(tblName string, fileId string) error {
 	_, err := strconv.Atoi(fileId)
 	if err != nil {
@@ -314,7 +338,7 @@ func (db *DB) Delete(tblName string, fileId string) error {
 	return nil
 }
 
-/*---------- Close ----------*/
+// Close closes an ivy database.
 func (db *DB) Close() {
 	for _, rwLock := range db.rwLocks {
 		rwLock.Lock()

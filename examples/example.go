@@ -7,22 +7,28 @@ import (
 
 // Need a struct for every table
 type Plane struct {
-	Name  string   `json:"name"`
-	Speed int      `json:"speed"`
-	Range int      `json:"range"`
-	Tags  []string `json:"tags"`
+	FileId string   `json:"-"`
+	Name   string   `json:"name"`
+	Speed  int      `json:"speed"`
+	Range  int      `json:"range"`
+	Tags   []string `json:"tags"`
 }
 
-// Need to add this method to every table struct
-func (plane *Plane) Transform() {
+func (plane *Plane) AfterFind(db *ivy.DB, fileId string) {
 	*plane = Plane(*plane)
+
+	plane.FileId = fileId
 }
 
 func main() {
+	// Specify which tables Ivy should build indexes for.
+	fieldsToIndex := make(map[string][]string)
+	fieldsToIndex["planes"] = []string{"tags"}
+
 	//
 	// Open DB
 	//
-	db, err := ivy.OpenDB("data")
+	db, err := ivy.OpenDB("data", fieldsToIndex)
 	if err != nil {
 		fmt.Println("Failed to open database:", err)
 	}
