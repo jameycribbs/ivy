@@ -18,7 +18,7 @@ Check out example.go in the examples directory.  For a more comprehensive exampl
 
 Pull requests/forks all welcome, and please share your thoughts, questions and feature requests in the [Issues] section or via [Email].
 
-[Email me]: mailto:jamey.cribbs@gmail.com
+[Email]: mailto:jamey.cribbs@gmail.com
 [Issues]: https://github.com/jameycribbs/ivy/issues
 [Pythia]: https://github.com/jameycribbs/pythia
 
