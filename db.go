@@ -14,6 +14,10 @@ import (
 )
 
 // Type Record is an interface that your table model needs to implement.
+// The AfterFind method is a callback that will run inside the Find method, right after the record is found and populated.
+// This method will be passed the database connection and the record id of the record just found. In your implementation
+// of this method, you should convert the record interface back to it's original type.
+// Take a look at example.go in the examples directory for a look at how to do this.
 type Record interface {
 	AfterFind(*DB, string)
 }

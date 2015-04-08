@@ -14,7 +14,12 @@ type Plane struct {
 	Tags   []string `json:"tags"`
 }
 
+// AfterFind is a callback that runs inside the Find method after the record has been found and populated.
+// You need to define an AfterFind for each one of your tables.
 func (plane *Plane) AfterFind(db *ivy.DB, fileId string) {
+	// IMPORTANT!  Make sure you do something like this in your AfterFind methods for your tables.
+	// This turns the interface record inside the Find method back into your particular struct type
+	// before returning the record to you.
 	*plane = Plane(*plane)
 
 	plane.FileId = fileId
