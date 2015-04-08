@@ -12,19 +12,21 @@ import (
 )
 
 type Record interface {
-	Transform()
+	AfterFind(*DB, string)
 }
 
 type DB struct {
-	path       string
-	rwLocks    map[string]*sync.RWMutex
-	tagIndexes map[string]map[string][]string
+	path          string
+	rwLocks       map[string]*sync.RWMutex
+	fieldsToIndex map[string][]string
+	tagIndexes    map[string]map[string][]string
 }
 
-func OpenDB(dbPath string) (*DB, error) {
-	db := &DB{}
+func OpenDB(dbPath string, fieldsToIndex map[string][]string) (*DB, error) {
+	db := new(DB)
 
 	db.path = dbPath
+	db.fieldsToIndex = fieldsToIndex
 
 	db.rwLocks = make(map[string]*sync.RWMutex)
 
@@ -36,11 +38,24 @@ func OpenDB(dbPath string) (*DB, error) {
 		if file.IsDir() {
 			if file.Name() != "." && file.Name() != ".." {
 				db.rwLocks[file.Name()] = new(sync.RWMutex)
+			}
+		}
+	}
 
-				err := db.initTagsIndex(file.Name())
+	for tbl, indexes := range fieldsToIndex {
+		for _, index := range indexes {
+			if index == "tags" {
+				err := db.initTagsIndex(tbl)
 				if err != nil {
 					return nil, err
 				}
+			} else {
+				/*
+					err := db.initIndex(tbl, index)
+					if err != nil {
+						return nil, err
+					}
+				*/
 			}
 		}
 	}
@@ -61,8 +76,7 @@ func (db *DB) Find(tblName string, rec Record, fileId string) error {
 		return err
 	}
 
-	// Turn struct back into whatever it started out as in calling app.
-	rec.Transform()
+	rec.AfterFind(db, fileId)
 
 	return nil
 }
@@ -111,8 +125,23 @@ func (db *DB) FindFirstIdForField(tblName string, searchField string, searchValu
 	return "", nil
 }
 
-/*---------- FindIdsForField ----------*/
-func (db *DB) FindIdsForField(tblName string, searchField string, searchValue interface{}) ([]string, error) {
+/*---------- FindAllIds ----------*/
+func (db *DB) FindAllIds(tblName string) ([]string, error) {
+	var ids []string
+
+	db.rwLocks[tblName].RLock()
+	defer db.rwLocks[tblName].RUnlock()
+
+	// For every file in the data dir...
+	for _, fileId := range db.fileIdsInDataDir(tblName) {
+		ids = append(ids, fileId)
+	}
+
+	return ids, nil
+}
+
+/*---------- FindAllIdsForField ----------*/
+func (db *DB) FindAllIdsForField(tblName string, searchField string, searchValue interface{}) ([]string, error) {
 	var rec map[string]interface{}
 	var ids []string
 
@@ -149,8 +178,8 @@ func (db *DB) FindIdsForField(tblName string, searchField string, searchValue in
 	return ids, nil
 }
 
-/*---------- FindIdsForTags ----------*/
-func (db *DB) FindIdsForTags(tblName string, searchTags []string) ([]string, error) {
+/*---------- FindAllIdsForTags ----------*/
+func (db *DB) FindAllIdsForTags(tblName string, searchTags []string) ([]string, error) {
 	var ids []string
 	var possibleMatchingFileIdsMap map[string]int
 
