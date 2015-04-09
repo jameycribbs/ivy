@@ -14,10 +14,12 @@ import (
 )
 
 // Type Record is an interface that your table model needs to implement.
-// The AfterFind method is a callback that will run inside the Find method, right after the record is found and populated.
-// This method will be passed the database connection and the record id of the record just found. In your implementation
-// of this method, you should convert the record interface back to it's original type.
-// Take a look at example.go in the examples directory for a look at how to do this.
+// The AfterFind method is a callback that will run inside the Find method,
+// right after the record is found and populated. This method will be passed the
+// database connection and the record id of the record just found. In your
+// implementation of this method, you should convert the record interface back
+// to it's original type. Take a look at example.go in the examples directory
+// for a look at how to do this.
 type Record interface {
 	AfterFind(*DB, string)
 }
@@ -28,6 +30,7 @@ type DB struct {
 	rwLocks       map[string]*sync.RWMutex
 	fieldsToIndex map[string][]string
 	tagIndexes    map[string]map[string][]string
+	fldIndexes    map[string]map[string]map[string][]string
 }
 
 // OpenDB initializes an ivy database.
@@ -41,6 +44,7 @@ func OpenDB(dbPath string, fieldsToIndex map[string][]string) (*DB, error) {
 	db.rwLocks = make(map[string]*sync.RWMutex)
 
 	db.tagIndexes = make(map[string]map[string][]string)
+	db.fldIndexes = make(map[string]map[string]map[string][]string)
 
 	files, _ := ioutil.ReadDir(db.path)
 
@@ -52,20 +56,16 @@ func OpenDB(dbPath string, fieldsToIndex map[string][]string) (*DB, error) {
 		}
 	}
 
-	for tbl, indexes := range fieldsToIndex {
-		for _, index := range indexes {
-			if index == "tags" {
-				err := db.initTagsIndex(tbl)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				/*
-					err := db.initIndex(tbl, index)
-					if err != nil {
-						return nil, err
-					}
-				*/
+	for tblName, fldNames := range fieldsToIndex {
+		err := db.initTblIndexes(tblName)
+		if err != nil {
+			return nil, err
+		}
+
+		if stringInSlice("tags", fldNames) {
+			err := db.initTagsIndex(tblName)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -78,9 +78,9 @@ func OpenDB(dbPath string, fieldsToIndex map[string][]string) (*DB, error) {
 /*****************************************************************************/
 
 // Find loads up a Record struct with the record corresponding to a supplied id.
-// It takes a table name, a pointer to a Record struct, and an id specifying the record to find.
-// It populates the Record struct attributes with values from the found record.
-// It returns any error encountered.
+// It takes a table name, a pointer to a Record struct, and an id specifying the
+// record to find. It populates the Record struct attributes with values from
+// the found record. It returns any error encountered.
 func (db *DB) Find(tblName string, rec Record, fileId string) error {
 	db.rwLocks[tblName].RLock()
 	defer db.rwLocks[tblName].RUnlock()
@@ -112,49 +112,53 @@ func (db *DB) FindAllIds(tblName string) ([]string, error) {
 	return ids, nil
 }
 
-// FindFirstIdForField returns the first record id that matches the supplied search criteria.
-// It takes a table name, a field name to search on, and a value to search for.
-// It returns a record id and any error encountered.
+// FindFirstIdForField returns the first record id that matches the supplied
+// search criteria. It takes a table name, a field name to search on, and a
+// value to search for. I t returns a record id and any error encountered.
 func (db *DB) FindFirstIdForField(tblName string, searchField string, searchValue interface{}) (string, error) {
 	var rec map[string]interface{}
 
 	db.rwLocks[tblName].RLock()
 	defer db.rwLocks[tblName].RUnlock()
 
-	// For every file in the data dir until you find a match...
-	for _, fileId := range db.fileIdsInDataDir(tblName) {
-		filename := db.filePath(tblName, fileId)
+	// If we have an index on that field...
+	if ids, ok := db.fldIndexes[tblName][searchField][searchValue.(string)]; ok {
+		return ids[0], nil
+	} else {
+		// otherwise, for every file in the data dir until you find a match...
+		for _, fileId := range db.fileIdsInDataDir(tblName) {
+			filename := db.filePath(tblName, fileId)
 
-		data, err := ioutil.ReadFile(filename)
-		if err != nil {
-			return "", err
-		}
+			data, err := ioutil.ReadFile(filename)
+			if err != nil {
+				return "", err
+			}
 
-		err = json.Unmarshal(data, &rec)
-		if err != nil {
-			return "", err
-		}
+			err = json.Unmarshal(data, &rec)
+			if err != nil {
+				return "", err
+			}
 
-		switch searchValue.(type) {
-		case int:
-			if rec[searchField].(int) == searchValue.(int) {
-				return fileId, nil
-			}
-		case int32:
-			if rec[searchField].(int32) == searchValue.(int32) {
-				return fileId, nil
-			}
-		case int64:
-			if rec[searchField].(int64) == searchValue.(int64) {
-				return fileId, nil
-			}
-		case string:
-			if rec[searchField].(string) == searchValue.(string) {
-				return fileId, nil
+			switch searchValue.(type) {
+			case int:
+				if rec[searchField].(int) == searchValue.(int) {
+					return fileId, nil
+				}
+			case int32:
+				if rec[searchField].(int32) == searchValue.(int32) {
+					return fileId, nil
+				}
+			case int64:
+				if rec[searchField].(int64) == searchValue.(int64) {
+					return fileId, nil
+				}
+			case string:
+				if rec[searchField].(string) == searchValue.(string) {
+					return fileId, nil
+				}
 			}
 		}
 	}
-
 	return "", nil
 }
 
@@ -168,7 +172,12 @@ func (db *DB) FindAllIdsForField(tblName string, searchField string, searchValue
 	db.rwLocks[tblName].RLock()
 	defer db.rwLocks[tblName].RUnlock()
 
-	// For every file in the data dir...
+	// If we have an index on that field...
+	if ids, ok := db.fldIndexes[tblName][searchField][searchValue.(string)]; ok {
+		return ids, nil
+	}
+
+	// Otherwise, for every file in the data dir...
 	for _, fileId := range db.fileIdsInDataDir(tblName) {
 		filename := db.filePath(tblName, fileId)
 
@@ -192,7 +201,6 @@ func (db *DB) FindAllIdsForField(tblName string, searchField string, searchValue
 				ids = append(ids, fileId)
 			}
 		}
-
 	}
 
 	return ids, nil
@@ -278,6 +286,11 @@ func (db *DB) Create(tblName string, rec interface{}) (string, error) {
 		return "", err
 	}
 
+	err = db.initTblIndexes(tblName)
+	if err != nil {
+		return "", err
+	}
+
 	return fileId, nil
 }
 
@@ -312,6 +325,11 @@ func (db *DB) Update(tblName string, rec interface{}, fileId string) error {
 		return err
 	}
 
+	err = db.initTblIndexes(tblName)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -335,6 +353,11 @@ func (db *DB) Delete(tblName string, fileId string) error {
 	}
 
 	err = db.initTagsIndex(tblName)
+	if err != nil {
+		return err
+	}
+
+	err = db.initTblIndexes(tblName)
 	if err != nil {
 		return err
 	}
@@ -426,7 +449,7 @@ func (db *DB) initTagsIndex(tblName string) error {
 	tagIndex := make(map[string][]string)
 
 	// Delete all the entries in the index.
-	for k := range db.tagIndexes {
+	for k := range db.tagIndexes[tblName] {
 		delete(db.tagIndexes[tblName], k)
 	}
 
@@ -467,6 +490,63 @@ func (db *DB) initTagsIndex(tblName string) error {
 	}
 
 	db.tagIndexes[tblName] = tagIndex
+
+	return nil
+}
+
+/*---------- initTblIndexes ----------*/
+func (db *DB) initTblIndexes(tblName string) error {
+	var rec map[string]interface{}
+
+	// Delete all the indexes for this table.
+	for k := range db.fldIndexes[tblName] {
+		delete(db.fldIndexes[tblName], k)
+	}
+
+	db.fldIndexes[tblName] = make(map[string]map[string][]string)
+
+	// Reinit all the indexes for this table.
+	for _, fldName := range db.fieldsToIndex[tblName] {
+		if fldName != "tags" {
+			db.fldIndexes[tblName][fldName] = make(map[string][]string)
+		}
+	}
+
+	// For every file in the data dir...
+	for _, fileId := range db.fileIdsInDataDir(tblName) {
+		filename := db.filePath(tblName, fileId)
+
+		data, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(data, &rec)
+		if err != nil {
+			return err
+		}
+
+		for _, fldName := range db.fieldsToIndex[tblName] {
+			// Skip tags because we index them separately
+			if fldName == "tags" {
+				continue
+			}
+
+			// Convert back into a string.
+			fldValue := rec[fldName].(string)
+
+			// If the field value already exists as a key in the index...
+			if fileIds, ok := db.fldIndexes[tblName][fldName][fldValue]; ok {
+				// Add the file id to the list of ids for that field value, if it is not already in the list.
+				if !stringInSlice(fileId, fileIds) {
+					db.fldIndexes[tblName][fldName][fldValue] = append(fileIds, fileId)
+				}
+			} else {
+				// Otherwise, add the field value with associated new file id to the index.
+				db.fldIndexes[tblName][fldName][fldValue] = []string{fileId}
+			}
+		}
+	}
 
 	return nil
 }

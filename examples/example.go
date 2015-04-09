@@ -7,11 +7,12 @@ import (
 
 // Need a struct for every table
 type Plane struct {
-	FileId string   `json:"-"`
-	Name   string   `json:"name"`
-	Speed  int      `json:"speed"`
-	Range  int      `json:"range"`
-	Tags   []string `json:"tags"`
+	FileId     string   `json:"-"`
+	Name       string   `json:"name"`
+	Speed      int      `json:"speed"`
+	Range      int      `json:"range"`
+	EngineType string   `json:"enginetype"`
+	Tags       []string `json:"tags"`
 }
 
 // AfterFind is a callback that runs inside the Find method after the record has been found and populated.
@@ -28,7 +29,7 @@ func (plane *Plane) AfterFind(db *ivy.DB, fileId string) {
 func main() {
 	// Specify which tables Ivy should build indexes for.
 	fieldsToIndex := make(map[string][]string)
-	fieldsToIndex["planes"] = []string{"tags"}
+	fieldsToIndex["planes"] = []string{"tags", "name", "enginetype"}
 
 	//
 	// Open DB
@@ -63,6 +64,8 @@ func main() {
 
 	fmt.Println("\n======================= Planes with tag 'german' ==================================================================\n")
 	for _, id := range ids {
+		plane = Plane{}
+
 		err = db.Find("planes", &plane, id)
 		if err != nil {
 			fmt.Println("Find failed:", err)
@@ -80,6 +83,9 @@ func main() {
 	}
 
 	fmt.Println("\n======================= Plane with name 'P-51D' ==================================================================\n")
+
+	plane = Plane{}
+
 	err = db.Find("planes", &plane, id)
 	if err != nil {
 		fmt.Println("Find failed:", err)
@@ -88,9 +94,29 @@ func main() {
 	fmt.Printf("%#v\n", plane.Name)
 
 	//
+	// FindAllIdsForField
+	//
+	ids, err = db.FindAllIdsForField("planes", "enginetype", "radial")
+	if err != nil {
+		fmt.Println("FindAllIdsForField failed:", err)
+	}
+
+	fmt.Println("\n======================= Planes with enginetype 'radial' ===========================================================\n")
+	for _, id := range ids {
+		plane = Plane{}
+
+		err = db.Find("planes", &plane, id)
+		if err != nil {
+			fmt.Println("Find failed:", err)
+		}
+
+		fmt.Printf("%#v\n", plane.Name)
+	}
+
+	//
 	// Create
 	//
-	plane = Plane{Name: "Test", Speed: 111, Range: 111, Tags: []string{"test"}}
+	plane = Plane{Name: "Test", Speed: 111, Range: 111, EngineType: "radial", Tags: []string{"test"}}
 	id, err = db.Create("planes", plane)
 	if err != nil {
 		fmt.Println("Create failed:", err)
@@ -113,12 +139,14 @@ func main() {
 		fmt.Println("Update failed:", err)
 	}
 
+	plane = Plane{}
+
 	err = db.Find("planes", &plane, id)
 	if err != nil {
 		fmt.Println("Find failed:", err)
 	}
 
-	fmt.Printf("\n======================= Plane with id '%v' ===================================================================\n", id)
+	fmt.Printf("\n======================= Plane with updated speed ==============================================================\n")
 	fmt.Printf("%#v\n", plane.Speed)
 
 	//
