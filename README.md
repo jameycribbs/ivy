@@ -4,6 +4,14 @@ Keywords: Golang, go, database, NoSQL, JSON
 
 Ivy is a database management system that stores each record as a __JSON__ file. It can be __embedded__ into your program and is safe to use in goroutines (it uses mutexes) as long as each goroutine shares the database connection.  This makes it ok to use in a web application.
 
+### Features
+
+- Pure Go
+- Goroutine safe (as long as each goroutine shares the database connection)
+- Can utilize indexes for faster queries
+- Embeddable
+- Database records are stored as json files, making for easy external access
+
 ### How to install
 
 ~~~
