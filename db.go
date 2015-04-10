@@ -281,14 +281,18 @@ func (db *DB) Create(tblName string, rec interface{}) (string, error) {
 		return "", err
 	}
 
-	err = db.initTagsIndex(tblName)
-	if err != nil {
-		return "", err
-	}
+	if fldNames, ok := db.fieldsToIndex[tblName]; ok {
+		err = db.initTblIndexes(tblName)
+		if err != nil {
+			return fileId, err
+		}
 
-	err = db.initTblIndexes(tblName)
-	if err != nil {
-		return "", err
+		if stringInSlice("tags", fldNames) {
+			db.initTagsIndex(tblName)
+			if err != nil {
+				return fileId, err
+			}
+		}
 	}
 
 	return fileId, nil
@@ -320,14 +324,18 @@ func (db *DB) Update(tblName string, rec interface{}, fileId string) error {
 		return err
 	}
 
-	db.initTagsIndex(tblName)
-	if err != nil {
-		return err
-	}
+	if fldNames, ok := db.fieldsToIndex[tblName]; ok {
+		err = db.initTblIndexes(tblName)
+		if err != nil {
+			return err
+		}
 
-	err = db.initTblIndexes(tblName)
-	if err != nil {
-		return err
+		if stringInSlice("tags", fldNames) {
+			db.initTagsIndex(tblName)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

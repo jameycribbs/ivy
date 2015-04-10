@@ -1,4 +1,4 @@
-Keywords: Golang, go, database, NoSQL, JSON
+Keywords: Golang, go, database, DBMS, JSON
 
 ### Ivy - A simple, file-based Database Management System (DBMS) for Go
 
@@ -24,7 +24,7 @@ Check out example.go in the examples directory.  For a more comprehensive exampl
 
 ### Contributions welcome!
 
-Pull requests/forks all welcome, and please share your thoughts, questions and feature requests in the [Issues] section or via [Email].
+Pull requests/forks/bug reports all welcome, and please share your thoughts, questions and feature requests in the [Issues] section or via [Email].
 
 [Email]: mailto:jamey.cribbs@gmail.com
 [Issues]: https://github.com/jameycribbs/ivy/issues
