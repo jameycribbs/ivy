@@ -529,8 +529,6 @@ func (db *DB) performChecks() error {
 		return err
 	}
 	for tbl := range db.fieldsToIndex {
-		fmt.Println(db.tblPath(tbl))
-
 		if _, err := os.Stat(db.tblPath(tbl)); os.IsNotExist(err) {
 			return err
 		}
