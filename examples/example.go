@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/jameycribbs/ivy"
+	"os"
 )
 
 // Need a struct for every table
@@ -27,7 +28,7 @@ func (plane *Plane) AfterFind(db *ivy.DB, fileId string) {
 }
 
 func main() {
-	// Specify which tables Ivy should build indexes for.
+	// Specify which tables Ivy should build indexes for.  Index fields must be of type string.
 	fieldsToIndex := make(map[string][]string)
 	fieldsToIndex["planes"] = []string{"tags", "name", "enginetype"}
 
@@ -37,6 +38,7 @@ func main() {
 	db, err := ivy.OpenDB("data", fieldsToIndex)
 	if err != nil {
 		fmt.Println("Failed to open database:", err)
+		os.Exit(1)
 	}
 
 	defer db.Close()
@@ -51,7 +53,7 @@ func main() {
 		fmt.Println("Find failed:", err)
 	}
 
-	fmt.Println("\n======================= Plane with id '1' =======================================================================\n")
+	fmt.Print("\n======================= Plane with id '1' =======================================================================\n\n")
 	fmt.Printf("%#v\n", plane.Name)
 
 	//
@@ -62,7 +64,7 @@ func main() {
 		fmt.Println("FindAllIdsForTags failed:", err)
 	}
 
-	fmt.Println("\n======================= Planes with tag 'german' ==================================================================\n")
+	fmt.Print("\n======================= Planes with tag 'german' ==================================================================\n\n")
 	for _, id := range ids {
 		plane = Plane{}
 
@@ -82,7 +84,7 @@ func main() {
 		fmt.Println("FindFirstIdForField failed:", err)
 	}
 
-	fmt.Println("\n======================= Plane with name 'P-51D' ==================================================================\n")
+	fmt.Print("\n======================= Plane with name 'P-51D' ==================================================================\n\n")
 
 	plane = Plane{}
 
@@ -101,7 +103,7 @@ func main() {
 		fmt.Println("FindAllIdsForField failed:", err)
 	}
 
-	fmt.Println("\n======================= Planes with enginetype 'radial' ===========================================================\n")
+	fmt.Print("\n======================= Planes with enginetype 'radial' ===========================================================\n\n")
 	for _, id := range ids {
 		plane = Plane{}
 
