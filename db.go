@@ -60,17 +60,10 @@ func OpenDB(dbPath string, fieldsToIndex map[string][]string) (*DB, error) {
 		}
 	}
 
-	for tblName, fldNames := range fieldsToIndex {
+	for tblName := range db.fieldsToIndex {
 		err := db.initTblIndexes(tblName)
 		if err != nil {
 			return nil, err
-		}
-
-		if stringInSlice("tags", fldNames) {
-			err := db.initTagsIndex(tblName)
-			if err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -247,18 +240,9 @@ func (db *DB) Create(tblName string, rec interface{}) (string, error) {
 		return "", err
 	}
 
-	if fldNames, ok := db.fieldsToIndex[tblName]; ok {
-		err = db.initTblIndexes(tblName)
-		if err != nil {
-			return fileId, err
-		}
-
-		if stringInSlice("tags", fldNames) {
-			db.initTagsIndex(tblName)
-			if err != nil {
-				return fileId, err
-			}
-		}
+	err = db.initTblIndexes(tblName)
+	if err != nil {
+		return fileId, err
 	}
 
 	return fileId, nil
@@ -290,18 +274,9 @@ func (db *DB) Update(tblName string, rec interface{}, fileId string) error {
 		return err
 	}
 
-	if fldNames, ok := db.fieldsToIndex[tblName]; ok {
-		err = db.initTblIndexes(tblName)
-		if err != nil {
-			return err
-		}
-
-		if stringInSlice("tags", fldNames) {
-			db.initTagsIndex(tblName)
-			if err != nil {
-				return err
-			}
-		}
+	err = db.initTblIndexes(tblName)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -322,11 +297,6 @@ func (db *DB) Delete(tblName string, fileId string) error {
 	defer db.rwLocks[tblName].Unlock()
 
 	err = os.Remove(filename)
-	if err != nil {
-		return err
-	}
-
-	err = db.initTagsIndex(tblName)
 	if err != nil {
 		return err
 	}
@@ -386,8 +356,8 @@ func (db *DB) loadRec(tblName string, rec interface{}, fileId string) error {
 	return err
 }
 
-// initTblIndexes initializes all non-tag indexes for a database.
-func (db *DB) initTblIndexes(tblName string) error {
+// initNonTagsIndexes initializes all non-tag indexes for a table.
+func (db *DB) initNonTagsIndexes(tblName string) error {
 	var rec map[string]interface{}
 
 	// Delete all the indexes for this table.
@@ -493,6 +463,24 @@ func (db *DB) initTagsIndex(tblName string) error {
 
 	db.tagIndexes[tblName] = tagIndex
 
+	return nil
+}
+
+// initTblIndexes initializes all indexes for a table.
+func (db *DB) initTblIndexes(tblName string) error {
+	if fldNames, ok := db.fieldsToIndex[tblName]; ok {
+		err := db.initNonTagsIndexes(tblName)
+		if err != nil {
+			return err
+		}
+
+		if stringInSlice("tags", fldNames) {
+			db.initTagsIndex(tblName)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
